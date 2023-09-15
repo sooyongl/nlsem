@@ -1,4 +1,4 @@
-------Begin Mplus Model Run: 1592023 10:35:01------
+------Begin Mplus Model Run: 15Sep2023 11:46:18------
 Run options:
 	Recursive (run models in subdirectories): FALSE
 	Show output on console: FALSE
@@ -6,4 +6,4 @@ Run options:
 ------
 Currently running model: test_inp.inp
 
-------End Mplus Model Run: 1592023 10:35:01------
+------End Mplus Model Run: 15Sep2023 11:46:21------

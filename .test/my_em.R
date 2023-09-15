@@ -43,7 +43,7 @@ while (run) {
   ll.old <- ll.new
   par.old <- par.new # par.new will keep updated
   
-  names(model$matrices$class1)[grep("Phi", names(model$matrices$class1))] <- "A"
+  # names(model$matrices$class1)[grep("Phi", names(model$matrices$class1))] <- "A"
   #------------------------------------------------------------------------
   # Compute E-step --------------------------------------------------------
   #------------------------------------------------------------------------
@@ -84,8 +84,10 @@ while (run) {
     # i = 1
     
     p.ij <- w[i] * mvtnorm::dmvnorm(dat, 
-                                    mean = nlsem:::mu_lms(model = mod.filled, z = V[i, ]), 
-                                    sigma = nlsem:::sigma_lms(model = mod.filled, z = V[i, ])
+                                    # mean = nlsem:::mu_lms(mod.filled, V[i, ]), 
+                                    # sigma = nlsem:::sigma_lms(mod.filled, V[i, ])
+                                    mean = MU_lms(mod.filled, V[i, ]),
+                                    sigma = SIGMA_lms(mod.filled, V[i, ])
     )
     P <- cbind(P, p.ij, deparse.level = 0)
   }
@@ -93,7 +95,9 @@ while (run) {
   P
   # Compute E-step         <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
   
-  # Compute M-setp --------------------------------------------------
+  #------------------------------------------------------------------------
+  # Compute M-setp --------------------------------------------------------
+  #------------------------------------------------------------------------
   # m.step <- nlsem:::mstep_lms(
   model = model#, 
   # ls.str(model)
@@ -106,22 +110,28 @@ while (run) {
   max.mstep = max.mstep#)
   ## nlsem:::mstep_lms <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
   # optimizer <- match.arg(optimizer)
-  
   # if (optimizer == "nlminb") {
   #   if (is.null(control$iter.max)) {
   #     control$iter.max <- max.mstep
   #   }
   #   else warning("iter.max is set for nlminb. max.mstep will be ignored.")
-  #   suppress_NaN_warnings(est <- nlminb(start = parameters,
-  #                                       objective = loglikelihood_lms, dat = dat, model = model,
-  #                                       P = P, upper = model$info$bounds$upper, lower = model$info$bounds$lower,
-  #                                       control = control, ...))
+  #   suppress_NaN_warnings(
+  #     est <- nlminb(start = parameters,
+  #                   objective = loglikelihood_lms, dat = dat, model = model,
+  #                   P = P, 
+  #                   upper = model$info$bounds$upper, 
+  #                   lower = model$info$bounds$lower,
+  #                   control = control, ...))
   # }
   # else {
   # if (is.null(control$maxit)) {
+  # control <- list()
+  # control$maxit <- max.mstep
+  # } 
+  #   else warning("maxit is set for optim. max.mstep will be ignored.")
+  
   control <- list()
   control$maxit <- max.mstep
-  # } else warning("maxit is set for optim. max.mstep will be ignored.")
   
   ## Likelihood for LMS <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
   if(F) {
@@ -129,16 +139,21 @@ while (run) {
     # function (parameters, model, dat, P, m = 16, ...) 
     # {
     mod.filled <- nlsem::fill_model(model = model, parameters = parameters)
+    mod.filled$matrices
     k <- nlsem:::get_k(mod.filled$matrices$class1$Omega)
     quad <- nlsem:::quadrature(m, k)
     V <- quad$n
     # if (k == 0) {
     #   V <- as.data.frame(0)
     # }
-    res0 <- sapply(seq_len(nrow(V)), function(i) {
-      lls <- sum(mvtnorm::dmvnorm(dat, 
-                                  mean = nlsem:::mu_lms(model = mod.filled, z = V[i, ]), 
-                                  sigma = nlsem:::sigma_lms(model = mod.filled, z = V[i, ]), log = TRUE) * P[, i])
+    res0 <- sapply(seq_len(nrow(V)), function(i) { # i = 1
+      lls <- sum(
+        mvtnorm::dmvnorm(dat, 
+                # mean = nlsem:::mu_lms(model = mod.filled, z = V[i, ]), 
+                # sigma = nlsem:::sigma_lms(model = mod.filled, z = V[i, ]), 
+                         mean = MU_lms(model = mod.filled, z = V[i, ]),
+                         sigma = SIGMA_lms(model = mod.filled, z = V[i, ]),
+                         log = TRUE) * P[, i])
       lls
     })
     res <- sum(res0)
@@ -166,7 +181,8 @@ while (run) {
   
   est <- nlminb(
     start=parameters, 
-    objective=nlsem:::loglikelihood_lms, 
+    # objective=nlsem:::loglikelihood_lms, 
+    objective=LL_lms, 
     dat=dat,
     model=model, 
     P=P, 
@@ -180,8 +196,9 @@ while (run) {
   
   # Calculate Hessian matrix for SE.-------------------------------------
   if (neg.hessian == TRUE) {
-    est$hessian <- nlme::fdHess(pars = est$par, fun = nlsem:::loglikelihood_lms, 
-                          model = model, dat = dat, P = P)$Hessian
+    est$hessian <- nlme::fdHess(pars = est$par, 
+                                fun = LL_lms, 
+                                model = model, dat = dat, P = P)$Hessian
   }
   #<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
   
@@ -226,7 +243,8 @@ A[lower.tri(A, diag = TRUE)] <-
 
 A[upper.tri(A)] <- t(A)[upper.tri(t(A))]
 Phi <- A %*% t(A)
-coefficients[grep("Phi", names(coefficients))] <- Phi[lower.tri(Phi, diag = F)]
+coefficients[grep("Phi", names(coefficients))] <- 
+  Phi[lower.tri(Phi, diag = F)]
 
 # Clean result output
 if (num.iter == max.iter) {
@@ -242,7 +260,6 @@ out <- list(model.class = class(model), coefficients = coefficients,
             objective = -final$objective, em.convergence = em_convergence, 
             neg.hessian = final$hessian, loglikelihoods = -ll.ret, 
             info = info)
-if (inherits(model, "semm") || inherits(model, "nsemm")) 
-  out$info$w <- model$info$w
-class(out) <- "emEst"
+
+
 out

@@ -1,13 +1,14 @@
 # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-nlsem:::mu_lms
+# nlsem:::mu_lms
 
-function (model, z) 
-{
-  z = V[8, ]
-  model = mod.filled
+MU_lms <- function (model, z) {
+  # z = V[8, ]
+  # model = mod.filled
   
   matrices <- model$matrices$class1
   k <- nlsem:::get_k(matrices$Omega)
+  
+  matrices$A <- t(chol(matrices$Phi))
   n <- nrow(matrices$A)
   if (k < n & k > 0) {
     z.1 <- c(z, rep(0, n - k))
@@ -30,14 +31,15 @@ function (model, z)
 }
 
 # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-nlsem:::sigma_lms
-function (model, z) 
-{
-  z = V[8, ]
-  model = mod.filled
+# nlsem:::sigma_lms
+SIGMA_lms <- function (model, z) {
+  # z = V[8, ]
+  # model = mod.filled
   
   matrices <- model$matrices$class1
   k <- nlsem:::get_k(matrices$Omega)
+  
+  matrices$A <- t(chol(matrices$Phi))
   n <- nrow(matrices$A)
   if (k < n & k > 0) {
     z.1 <- c(z, rep(0, n - k))
@@ -46,6 +48,9 @@ function (model, z)
   #   z.1 <- rep(0, n - k)
   # }
   # else z.1 <- z
+  
+  
+  
   A.z <- matrices$A %*% z.1
   d.mat <- nlsem:::get_d(n = n, k = k)
   

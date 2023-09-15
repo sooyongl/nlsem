@@ -2,7 +2,9 @@
 # install.packages("nlsem")
 # install.packages(c("gaussquad","mvtnorm"))
 
-for(i in fs::dir_ls("../R")) { source(i)}
+# for(i in fs::dir_ls("../R")) { source(i)}
+
+for(i in c("my_likelihood.R","my_samplestat_lms.R")) { source(i)}
 
 library(data.table)
 library(tidyverse)
@@ -13,43 +15,42 @@ library(gaussquad)
 fdHess <- nlme::fdHess
 
 data <- fread(fs::dir_ls("../data")[1])
-data <- data %>% select(x1:x3, x4, x5, y1) #%>% 
+data <- data %>% select(x1:x3, x4, x5, y1) #%>%
   # mutate(
   #   x4 = if_else(x4 > mean(x4), 1, 0)
   # )
 
-fwrite(data, "test_dt.csv", col.names = F)
-
-writeLines("
-DATA: file is test_dt.csv;
-VARIABLE: names are v1-v3 z x y;
-
-ANALYSIS:
- type = random;
-  ALGORITHM=INTEGRATION;
-model:
-
-F1 by v1-v3;
-[v1@0];
-[F1];
-F1*;
-
-!zz by z@1;
-![z@0];
-! z@0;
-
-F1z | F1 XWITH z;
-
-y on z x F1 F1z;
-
-
-F1 with x;
-F1 with z;
-
-", "test_inp.inp")
-
-MplusAutomation::runModels("test_inp.inp")
-file.show("test_inp.out")
+# fwrite(data, "test_dt.csv", col.names = F)
+# writeLines("
+# DATA: file is test_dt.csv;
+# VARIABLE: names are v1-v3 z x y;
+# 
+# ANALYSIS:
+#  type = random;
+#   ALGORITHM=INTEGRATION;
+# model:
+# 
+# F1 by v1-v3;
+# [v1@0];
+# [F1];
+# F1*;
+# 
+# !zz by z@1;
+# ![z@0];
+# ! z@0;
+# 
+# F1z | F1 XWITH z;
+# 
+# y on z x F1 F1z;
+# 
+# 
+# F1 with x;
+# F1 with z;
+# 
+# ", "test_inp.inp")
+# 
+# MplusAutomation::runModels("test_inp.inp")
+# file.show("test_inp.out")
 
 
 # data <- data %>% select(x1:x3, x4, x5, y1) %>%
@@ -83,11 +84,19 @@ specs[specs$label %in% paste0("Lambda.x4", 1), "class1"] <- 1
 specs[specs$label %in% paste0("Lambda.x5", 1), "class1"] <- 1
 specs[specs$label %in% paste0("Theta.d", c(19,25)), "class1"] <- c(0,0)
 specs[specs$label %in% paste0("Theta.e", c("")), "class1"] <- c(0)
-specs[specs$label %in% paste0("Phi", c(5,6,9)), "class1"] <- c(var(data$x4),cov(data$x5, data$x4), var(data$x5))
-specs[specs$label %in% paste0("tau", c(2,3)), "class1"] <- c(mean(data$x4),mean(data$x5))
+
+specs[specs$label %in% paste0("tau", c(2,3)), "class1"] <- 
+  c(mean(data$x4),mean(data$x5))
+
+# Phi is A : cholesky decomposition
+# A.chol <- t(chol(A))
+specs[specs$label %in% paste0("Phi", c(5,6,9)), "class1"] <- 
+  c(var(data$x4),cov(data$x5, data$x4), var(data$x5))
+specs[specs["label"]%in%paste0("Phi",4:9)] <- NULL
 
 my_model <- create_sem(specs)
 my_model$matrices
+my_model$info
 
 pars.start <- runif(count_free_parameters(my_model))
 
@@ -115,6 +124,8 @@ summary(res)
 
 
 ####
+data <- fread(fs::dir_ls("../data")[1])
+
 model <- specify_sem(
   num.x = 6, 
   num.y = 3,
@@ -123,13 +134,11 @@ model <- specify_sem(
   xi = "x1-x3,x4-x6",
   eta = "y1-y3", 
   num.classes = 1,
-  interaction = "xi1:xi2")
+  interaction = "eta1~xi1:xi2")
 
-class(model)
 model$matrices# 
 
-specs <- nlsem:::as.data.frame.singleClass(model)
-head(specs)
+specs <- as.data.frame(model)
 
 my_model <- create_sem(specs)
 my_model$matrices
@@ -150,8 +159,6 @@ res <- em(model = my_model,
 )
 
 summary(res)
-
-
 
 fwrite(data, "test_dt.csv", col.names = F)
 
@@ -189,10 +196,11 @@ data("PoliticalDemocracy", package = "lavaan")
 dat <- as.matrix(PoliticalDemocracy[ ,c(9:11,1:8)])
 
 model <- specify_sem(
-  num.x = 3, num.y = 8, num.xi = 1, num.eta = 2,
-  xi = "x1-x3", eta = "y1-y4,y5-y8", 
-  rel.lat = "eta1~xi1,eta2~xi1,eta2~eta1",
-  # num.classes = 1, 
+  num.x = 8, num.y = 3, 
+  num.xi = 2, num.eta = 1,
+  xi = "x1-x3,y1-y4", 
+  eta = "y5-y8", 
+  num.classes = 1,
   interaction = "eta1~xi1:xi2")
 
 em(model, data, start, qml = FALSE, verbose = FALSE, 
