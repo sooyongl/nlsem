@@ -1,8 +1,9 @@
 # Compute EM algorithm for LMS
 
+
 # Argument inputs ---------------------------------------------
 model = my_model
-data = data
+data = data %>% select(x1:x5, y1)
 
 start =  pars.start
 qml = F
@@ -13,11 +14,12 @@ max.mstep = 1
 max.singleClass = 1 
 neg.hessian = TRUE
 m = 16
-optimizer = c("nlminb")
+optimizer = c("optim")
 
 # EM Estimation begins ----------------------------------------------------
 ## Validate starting values (e.g., negative value for variances)  
 par.new <- nlsem:::convert_parameters_singleClass(model, start)
+
 
 ll.ret <- NULL # Save likelihoods across iterations (from M step)
 ll.new <- 0    # Likelihood every iteration (from M step)
@@ -44,16 +46,14 @@ while (run) {
   par.old <- par.new # par.new will keep updated
   
   names(model$matrices$class1)[grep("Phi", names(model$matrices$class1))] <- "A"
-  #------------------------------------------------------------------------
-  # Compute E-step --------------------------------------------------------
-  #------------------------------------------------------------------------
   
+  # Compute E-step --------------------------------------------------------
+  # P <- nlsem:::estep_lms(
   model = model
   parameters = par.old
   dat = data
   m = m
-  
-  ##### Compute E-step         <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+  ##### nlsem:::estep_lms function <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
   stopifnot(count_free_parameters(model) == length(parameters))
   mod.filled <- fill_model(model = model, parameters = parameters)
   mod.filled$matrices
@@ -77,7 +77,7 @@ while (run) {
     V <- quad$n
     w <- quad$w
   } 
-  # Calculate Hermite Quadrature <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+  # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
   
   P <- NULL
   for (i in seq_along(w)) {
@@ -91,7 +91,7 @@ while (run) {
   }
   P <- P/rowSums(P)
   P
-  # Compute E-step         <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+  # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
   
   # Compute M-setp --------------------------------------------------
   # m.step <- nlsem:::mstep_lms(
@@ -124,55 +124,37 @@ while (run) {
   # } else warning("maxit is set for optim. max.mstep will be ignored.")
   
   ## Likelihood for LMS <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-  if(F) {
-    # nlsem:::loglikelihood_lms(parameters, model, dat, P, m = 16)
-    # function (parameters, model, dat, P, m = 16, ...) 
-    # {
-    mod.filled <- nlsem::fill_model(model = model, parameters = parameters)
-    k <- nlsem:::get_k(mod.filled$matrices$class1$Omega)
-    quad <- nlsem:::quadrature(m, k)
-    V <- quad$n
-    # if (k == 0) {
-    #   V <- as.data.frame(0)
-    # }
-    res0 <- sapply(seq_len(nrow(V)), function(i) {
-      lls <- sum(mvtnorm::dmvnorm(dat, 
-                                  mean = nlsem:::mu_lms(model = mod.filled, z = V[i, ]), 
-                                  sigma = nlsem:::sigma_lms(model = mod.filled, z = V[i, ]), log = TRUE) * P[, i])
-      lls
-    })
-    res <- sum(res0)
-    -res
-    # }
-  }
+  nlsem:::loglikelihood_lms(parameters, model, dat, P, m = 16)
+  # function (parameters, model, dat, P, m = 16, ...) 
+  # {
+  mod.filled <- nlsem::fill_model(model = model, parameters = parameters)
+  k <- nlsem:::get_k(mod.filled$matrices$class1$Omega)
+  quad <- nlsem:::quadrature(m, k)
+  V <- quad$n
+  # if (k == 0) {
+  #   V <- as.data.frame(0)
+  # }
+  res0 <- sapply(seq_len(nrow(V)), function(i) {
+    lls <- sum(dmvnorm(dat, 
+                       mean = nlsem:::mu_lms(model = mod.filled, z = V[i, ]), 
+                       sigma = nlsem:::sigma_lms(model = mod.filled, z = V[i, ]), log = TRUE) * P[, i])
+    lls
+  })
+  res <- sum(res0)
+  -res
+  # }
   ## <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
   
   # Compute parameters acheiving Maximum Likelihood ------------------------
-  if(TRUE){
-    cat("Doing maximization-step \n")
-  }
-  
-  # est <- optim(
-  #   par = parameters,
-  #   fn = nlsem:::loglikelihood_lms,
-  #   model = model,
-  #   dat = dat,
-  #   P = P,
-  #   # upper = model$info$bounds$upper,
-  #   # lower = model$info$bounds$lower,
-  #   # method = "L-BFGS-B",
-  #   control = control)
-  
-  
-  est <- nlminb(
-    start=parameters, 
-    objective=nlsem:::loglikelihood_lms, 
-    dat=dat,
-    model=model, 
-    P=P, 
-    upper=model$info$bounds$upper,
-    lower=model$info$bounds$lower, 
-    control=control)
+  est <- optim(
+    par = parameters, 
+    fn = nlsem:::loglikelihood_lms, 
+    model = model, 
+    dat = dat, 
+    P = P, 
+    upper = model$info$bounds$upper, 
+    lower = model$info$bounds$lower, method = "L-BFGS-B", 
+    control = control)
   
   names(est) <- gsub("value", "objective", names(est))
   # }
@@ -180,18 +162,22 @@ while (run) {
   
   # Calculate Hessian matrix for SE.-------------------------------------
   if (neg.hessian == TRUE) {
-    est$hessian <- nlme::fdHess(pars = est$par, fun = nlsem:::loglikelihood_lms, 
+    est$hessian <- fdHess(pars = est$par, fun = loglikelihood_lms, 
                           model = model, dat = dat, P = P)$Hessian
   }
   #<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
   
+  est
+  
   m.step <- est
   # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+  
   
   ll.new <- m.step$objective
   ll.ret <- c(ll.ret, ll.new)
   par.new <- unlist(m.step$par)
   num.iter <- num.iter + 1
+  
   
   if (num.iter == max.iter) {
     warning("Maximum number of iterations was reached. EM algorithm might not have converged.")
@@ -205,28 +191,17 @@ while (run) {
 # <<<<<<<<<<<<<<<<<< EM algorithm ends <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 # Finalize M estimation ----------------------------------------------------
-final <- 
-  nlsem:::mstep_lms(
-    model = model, 
-    P = P, 
-    dat = data, 
-    parameters = par.new, 
-    neg.hessian = neg.hessian, 
-    m = m, 
-    optimizer = optimizer, 
-    max.mstep = max.mstep)
-
+final <- mstep_lms(model = model, P = P, dat = data, 
+                   parameters = par.new, neg.hessian = neg.hessian, 
+                   m = m, optimizer = optimizer, max.mstep = max.mstep)
 coefficients <- final$par
 names(coefficients) <- model$info$par.names
-# Transform parameters back to Phi
 A <- matrix(0, nrow = model$info$num.xi, ncol = model$info$num.xi)
-A[lower.tri(A, diag = TRUE)] <-
-  c(coefficients[grep("Phi", names(coefficients))],
-    model$matrices$class1$A[lower.tri(model$matrices$class1$A, diag = TRUE)][!is.na(model$matrices$class1$A[lower.tri(model$matrices$class1$A, diag = TRUE)])])
-
-A[upper.tri(A)] <- t(A)[upper.tri(t(A))]
+A[lower.tri(A, diag = TRUE)] <- coefficients[grep("Phi", 
+                                                  names(coefficients))]
 Phi <- A %*% t(A)
-coefficients[grep("Phi", names(coefficients))] <- Phi[lower.tri(Phi, diag = F)]
+coefficients[grep("Phi", names(coefficients))] <- Phi[lower.tri(Phi, diag = TRUE)]
+
 
 # Clean result output
 if (num.iter == max.iter) {
@@ -246,3 +221,4 @@ if (inherits(model, "semm") || inherits(model, "nsemm"))
   out$info$w <- model$info$w
 class(out) <- "emEst"
 out
+}

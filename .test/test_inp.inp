@@ -1,0 +1,28 @@
+
+DATA: file is test_dt.csv;
+VARIABLE: names are v1-v3 z x y;
+
+ANALYSIS:
+ type = random;
+  ALGORITHM=INTEGRATION;
+model:
+
+F1 by v1-v3;
+[v1@0];
+[F1];
+F1*;
+
+zz by z@1;
+[z@0];
+ z@0;
+
+F1z | F1 XWITH zz;
+
+zz on x;
+y on zz x F1 F1z;
+
+
+F1 with x;
+F1 with zz;
+
+

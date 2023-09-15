@@ -1,49 +1,186 @@
-# for(i in fs::dir_ls("../R")) { source(i)}
+# rm(list = ls())
 # install.packages("nlsem")
 # install.packages(c("gaussquad","mvtnorm"))
-library(nlsem)
+
+for(i in fs::dir_ls("../R")) { source(i)}
+
 library(data.table)
+library(tidyverse)
+
+# library(nlsem)
+library(mvtnorm)
+library(gaussquad)
+fdHess <- nlme::fdHess
 
 data <- fread(fs::dir_ls("../data")[1])
+data <- data %>% select(x1:x3, x4, x5, y1) #%>% 
+  # mutate(
+  #   x4 = if_else(x4 > mean(x4), 1, 0)
+  # )
+
+fwrite(data, "test_dt.csv", col.names = F)
+
+writeLines("
+DATA: file is test_dt.csv;
+VARIABLE: names are v1-v3 z x y;
+
+ANALYSIS:
+ type = random;
+  ALGORITHM=INTEGRATION;
+model:
+
+F1 by v1-v3;
+[v1@0];
+[F1];
+F1*;
+
+!zz by z@1;
+![z@0];
+! z@0;
+
+F1z | F1 XWITH z;
+
+y on z x F1 F1z;
+
+
+F1 with x;
+F1 with z;
+
+", "test_inp.inp")
+
+MplusAutomation::runModels("test_inp.inp")
+file.show("test_inp.out")
+
+
+# data <- data %>% select(x1:x3, x4, x5, y1) %>%
+#   set_names(c("v1","v2","v3","z","x","y")) %>%
+#   mutate(
+#     z = if_else(z > mean(z), 1, 0)
+#   ) %>%
+#   select(y, z, x, v1:v3)
+
 # 
 model <- specify_sem(
-  num.x = 6, num.y = 3,
-  num.xi = 2, num.eta = 1,
-  xi = "x1-x3,x4-x6",
-  eta = "y1-y3", 
+  num.x = 5, 
+  num.y = 1,
+  num.xi = 3,
+  num.eta = 1,
+  xi = "x1-x3,x4,x5",
+  eta = "y1", 
   num.classes = 1,
   interaction = "xi1:xi2")
+
 class(model)
 model$matrices# 
+model$info
+
 
 specs <- nlsem:::as.data.frame.singleClass(model)
 head(specs)
+
 # User constraints
-# specs[specs$label %in% paste0("Lambda.x", c(2, 3, 11, 12)), "class1"] <- 1
+specs[specs$label %in% paste0("Lambda.x4", 1), "class1"] <- 1
+specs[specs$label %in% paste0("Lambda.x5", 1), "class1"] <- 1
+specs[specs$label %in% paste0("Theta.d", c(19,25)), "class1"] <- c(0,0)
+specs[specs$label %in% paste0("Theta.e", c("")), "class1"] <- c(0)
+specs[specs$label %in% paste0("Phi", c(5,6,9)), "class1"] <- c(var(data$x4),cov(data$x5, data$x4), var(data$x5))
+specs[specs$label %in% paste0("tau", c(2,3)), "class1"] <- c(mean(data$x4),mean(data$x5))
 
 my_model <- create_sem(specs)
+my_model$matrices
 
 pars.start <- runif(count_free_parameters(my_model))
+
+saveRDS(list(data = data, model = my_model, pars.start = pars.start), "data_and_modelSpec.RDS")
+
+# model.filled <- nlsem::fill_model(model = model, parameters = pars.start)
+# model.filled$matrices
+
 args(em)
 res <- em(model = my_model, 
           data = data,
           start =  pars.start, 
           qml = F,
-          verbose = F,
+          verbose = T,
           convergence = 0.1, 
           max.iter = 200,
           max.singleClass = 1, 
           neg.hessian = TRUE,
           m = 16, 
-          optimizer = c("optim")
+          optimizer = c("nlminb")
           )
 
 summary(res)
 
 
 
+####
+model <- specify_sem(
+  num.x = 6, 
+  num.y = 3,
+  num.xi = 2,
+  num.eta = 1,
+  xi = "x1-x3,x4-x6",
+  eta = "y1-y3", 
+  num.classes = 1,
+  interaction = "xi1:xi2")
+
+class(model)
+model$matrices# 
+
+specs <- nlsem:::as.data.frame.singleClass(model)
+head(specs)
+
+my_model <- create_sem(specs)
+my_model$matrices
+
+pars.start <- runif(count_free_parameters(my_model))
+
+res <- em(model = my_model, 
+          data = data,
+          start =  pars.start, 
+          qml = F,
+          verbose = T,
+          convergence = 0.1, 
+          max.iter = 200,
+          max.singleClass = 1, 
+          neg.hessian = TRUE,
+          m = 16, 
+          optimizer = c("nlminb")
+)
+
+summary(res)
 
 
+
+fwrite(data, "test_dt.csv", col.names = F)
+
+writeLines("
+DATA: file is test_dt.csv;
+VARIABLE: names are x1-x6 y1-y3;
+
+ANALYSIS:
+ type = random;
+ ALGORITHM=INTEGRATION;
+
+model:
+
+F1 by x1-x3;
+F2 by x4-x6;
+
+F3 by y1-y3;
+[y1@0];
+[x1@0];
+[x4@0];
+
+F12 | F1 XWITH F2;
+
+F3 on F1 F2 F12;
+
+", "test_inp.inp")
+
+MplusAutomation::runModels("test_inp.inp")
+file.show("test_inp.out")
 
 # -------------------------------------------------------------------------
 
