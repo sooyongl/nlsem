@@ -27,30 +27,27 @@ data <- dplyr::select(data, x1:x3, x4, x5, y1) #%>%
 fwrite(data, "test_dt.csv", col.names = F)
 writeLines("
 DATA: file is test_dt.csv;
-VARIABLE: names are v1-v3 z x y;
+  VARIABLE: names are v1-v3 z x y;
 
-ANALYSIS:
- type = random;
-  ALGORITHM=INTEGRATION;
-model:
+  ANALYSIS:
+   type = random;
+    ALGORITHM=INTEGRATION;
+  model:
 
-F1 by v1-v3;
-[v1@0];
-[F1];
-F1*;
+  F1 by v1@1 v2-v3; !(Lambda.x2-3)
+  [v1@0]; 
+  [v2-v3];     !(nu.x)
+  [F1];        !(tau)
+  F1*;         !(Phi1)
+  F1 with z;   !(Phi2)
+  F1 with x;   !(Phi3)
 
-!zz by z@1;
-![z@0];
-! z@0;
+  F1z | F1 XWITH z;
 
-F1z | F1 XWITH z;
-
-y on z x F1 F1z;
-
-
-F1 with x;
-F1 with z;
-
+  y on F1 z x; !(gamma1-3) 
+  y on F1z ;   !(Omega)
+  [y];         !(alpha)
+  y  ;         !(Psi)
 ", "test_inp.inp")
 
 

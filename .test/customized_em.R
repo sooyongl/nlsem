@@ -192,7 +192,8 @@ final$par
 
 saveRDS(final, "LMS_estimates.RDS")
 
-
+# Benchmark ---------------------------------------------------------------
+file.show("test_inp.out")
 
 
 
