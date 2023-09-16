@@ -18,43 +18,44 @@ for(i in c("utils.R","customized_sampleStat.R",
            "customized_Likelihood.R")) { source(i)}
 
 
-data <- fread(fs::dir_ls("../data")[1])
-data <- data %>% select(x1:x3, x4, x5, y1) #%>%
+data <- data.table::fread(fs::dir_ls("../data")[1])
+data <- dplyr::select(data, x1:x3, x4, x5, y1) #%>%
   # mutate(
   #   x4 = if_else(x4 > mean(x4), 1, 0)
   # )
 
-# fwrite(data, "test_dt.csv", col.names = F)
-# writeLines("
-# DATA: file is test_dt.csv;
-# VARIABLE: names are v1-v3 z x y;
-# 
-# ANALYSIS:
-#  type = random;
-#   ALGORITHM=INTEGRATION;
-# model:
-# 
-# F1 by v1-v3;
-# [v1@0];
-# [F1];
-# F1*;
-# 
-# !zz by z@1;
-# ![z@0];
-# ! z@0;
-# 
-# F1z | F1 XWITH z;
-# 
-# y on z x F1 F1z;
-# 
-# 
-# F1 with x;
-# F1 with z;
-# 
-# ", "test_inp.inp")
-# 
-# MplusAutomation::runModels("test_inp.inp")
-# file.show("test_inp.out")
+fwrite(data, "test_dt.csv", col.names = F)
+writeLines("
+DATA: file is test_dt.csv;
+VARIABLE: names are v1-v3 z x y;
+
+ANALYSIS:
+ type = random;
+  ALGORITHM=INTEGRATION;
+model:
+
+F1 by v1-v3;
+[v1@0];
+[F1];
+F1*;
+
+!zz by z@1;
+![z@0];
+! z@0;
+
+F1z | F1 XWITH z;
+
+y on z x F1 F1z;
+
+
+F1 with x;
+F1 with z;
+
+", "test_inp.inp")
+
+
+MplusAutomation::runModels("test_inp.inp")
+file.show("test_inp.out")
 
 
 # data <- data %>% select(x1:x3, x4, x5, y1) %>%
@@ -65,7 +66,7 @@ data <- data %>% select(x1:x3, x4, x5, y1) #%>%
 #   select(y, z, x, v1:v3)
 
 # 
-model <- specify_sem(
+model <- nlsem::specify_sem(
   num.x = 5, 
   num.y = 1,
   num.xi = 3,
@@ -98,14 +99,37 @@ specs[specs$label %in% paste0("Phi", c(5,6,9)), "class1"] <-
   c(var(data$x4),cov(data$x5, data$x4), var(data$x5))
 specs[specs["label"]%in%paste0("Phi",4:9)] <- NULL
 
-my_model <- create_sem(specs)
+my_model <- nlsem::create_sem(specs)
+
+my_model$matrices
+my_model$info$par.names[my_model$info$par.names == "tau1"] <- "tau"
+my_model$info$par.names[my_model$info$par.names == "Omega4"] <- "Omega"
+
+pars.start <- runif(nlsem:::count_free_parameters(my_model))
+names(pars.start) <- my_model$info$par.names
+pars.start["Phi1"] <- 0.5
+pars.start[c("Phi2","Phi3")] <- c(0.08,0.1)
+
+pars.start[c("Lambda.x2","Lambda.x3")] <- c(1,1)
+
+pars.start[c("Gamma1","Gamma2","Gamma3")] <- c(0.2,0.1,0.1)
+
+pars.start[c("Theta.d1","Theta.d7","Theta.d13")] <- c(0.1)
+pars.start[c("Psi")] <- c(0.1)
+
+pars.start[c("tau")] <- c(2.5)
+pars.start[c("alpha")] <- c(0.2)
+pars.start[c("nu.x2","nu.x3")] <- c(-0.3, -0.1)
+
+names(pars.start)[names(pars.start)=="Omega4"] <- "Omega"
+
+pars.start[c("Omega")] <- c(-0.02)
+
+my_model$matrices$class1$Phi[1,2] <- NA
+my_model$matrices$class1$Phi[2,3] <- my_model$matrices$class1$Phi[3,2]
+my_model$matrices$class1$Phi[1,3] <- NA
 my_model$matrices
 my_model$info
-
-pars.start <- runif(count_free_parameters(my_model))
-names(pars.start) <- my_model$info$par.names
-pars.start["Phi1"] <- 1
-pars.start[c("Phi2","Phi3")] <- 0
 
 saveRDS(list(data = data, model = my_model, pars.start = pars.start), "data_and_modelSpec.RDS")
 

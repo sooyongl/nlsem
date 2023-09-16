@@ -4,6 +4,7 @@
 LL_lms <- function (parameters, model, dat, P, m = 16, ...) 
 {
   mod.filled <- fill_model(model = model, parameters = parameters)
+  
   k <- 1
   quad <- quadrature(m, k)
   V <- quad$n
@@ -12,7 +13,7 @@ LL_lms <- function (parameters, model, dat, P, m = 16, ...)
     V <- as.data.frame(0)
   
   res0 <- sapply(seq_len(nrow(V)), function(i) {
-    lls <- sum(dmvnorm(dat, 
+    lls <- sum(mvtnorm::dmvnorm(dat, 
                        mean = MU_lms(model = mod.filled, z = V[i, ]), 
                        sigma = SIGMA_lms(model = mod.filled,z = V[i, ]), 
                        log = TRUE) * P[, i])

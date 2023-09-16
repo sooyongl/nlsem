@@ -1,16 +1,36 @@
-# Compute EM algorithm for LMS
+# rm(list = ls())
+for(i in c("utils.R","customized_sampleStat.R",
+           "customized_Likelihood.R")) { source(i)}
 
-# Argument inputs ---------------------------------------------
-model = my_model     # Model matrix
+dmvnorm <- mvtnorm::dmvnorm
+fdHess <- nlme::fdHess
+
+inp <- readRDS("data_and_modelSpec.RDS")
+
+data <- inp$data
+inp_model <- list(
+  matrices = inp$model$matrices,
+  info = inp$model$info)
+pars.start <- inp$pars.start
+
+
+# ------------------------------------------------------
+# Compute EM algorithm for LMS
+# -------------------------------------------------------
+
+# Argument inputs --------------------------------------
+# These arguments come from `em` function in `nlsem` package
+
+model = inp_model     # Model matrix
 data = data          # input data
 start =  pars.start  # Starting values
 
-max.iter = 100        # Maximum interation for EM; default is 50
+max.iter = 1000        # Maximum iteration for EM; default is 200
 max.mstep = 1        # Iteration for mstep; default is 1
-convergence = 0.5    # Should be smaller
+convergence = 0.01   # 
 m = 16               # number of quadrature points
 
-neg.hessian = FALSE  # for getting SE
+neg.hessian = FALSE  # for getting SE (For Hessian matrix)
 optimizer = "nlminb" # Obtain MLE
 
 max.singleClass = 1  
@@ -48,7 +68,6 @@ while (run) {
   
   ##### Compute E-step         <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
   mod.filled <- fill_model(model = model, parameters = parameters)
-  mod.filled$matrices
   
   # Calculate Hermite Quadrature <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
   k <- 1 # Number of interaction effects
@@ -84,17 +103,20 @@ while (run) {
   control <- list(maxit = max.mstep)
   
   ## Compute Likelihood for LMS <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+  ## This is for testing
   if(F) {
-    
+
     mod.filled <- fill_model(model = model, parameters = parameters)
+    
     mod.filled$matrices
+    
     k <- 1
     quad <- quadrature(m, k)
     V <- quad$n # quadrature points
-    
+
     res0 <- sapply(seq_len(nrow(V)), function(i) { # i = 1
       lls <- sum(
-        mvtnorm::dmvnorm(dat, 
+        mvtnorm::dmvnorm(dat,
                          mean = MU_lms(model = mod.filled, z = V[i, ]),
                          sigma = SIGMA_lms(model = mod.filled, z = V[i, ]),
                          log = TRUE) * P[, i])
@@ -106,7 +128,7 @@ while (run) {
   }
   ## Compute Likelihood Ends <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
   
-  # Compute parameters acheiving Maximum Likelihood <<<<<<<<<<<<<<<<<<<<<<<
+  # Compute parameters achieving Maximum Likelihood <<<<<<<<<<<<<<<<<<<<<<<
   if(TRUE){
     cat("Doing maximization-step \n")
   }
@@ -162,9 +184,9 @@ final <- nlminb(
   upper=model$info$bounds$upper,
   lower=model$info$bounds$lower, 
   control=control)
-names(est) <- gsub("value", "objective", names(est))
+names(est) <- gsub("LL", "objective", names(est))
 
-
+# Final parameter estimates ------------------------------------------------
 final$par
 
 
