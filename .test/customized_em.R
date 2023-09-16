@@ -190,6 +190,9 @@ names(est) <- gsub("LL", "objective", names(est))
 # Final parameter estimates ------------------------------------------------
 final$par
 
+saveRDS(final, "LMS_estimates.RDS")
+
+
 
 
 
