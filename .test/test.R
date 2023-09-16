@@ -4,15 +4,19 @@
 
 # for(i in fs::dir_ls("../R")) { source(i)}
 
-for(i in c("my_likelihood.R","my_samplestat_lms.R")) { source(i)}
+# for(i in c("my_likelihood.R","my_samplestat_lms.R")) { source(i)}
 
 library(data.table)
 library(tidyverse)
 
 # library(nlsem)
-library(mvtnorm)
-library(gaussquad)
-fdHess <- nlme::fdHess
+# library(mvtnorm)
+# library(gaussquad)
+# fdHess <- nlme::fdHess
+
+for(i in c("utils.R","customized_sampleStat.R",
+           "customized_Likelihood.R")) { source(i)}
+
 
 data <- fread(fs::dir_ls("../data")[1])
 data <- data %>% select(x1:x3, x4, x5, y1) #%>%
@@ -99,6 +103,9 @@ my_model$matrices
 my_model$info
 
 pars.start <- runif(count_free_parameters(my_model))
+names(pars.start) <- my_model$info$par.names
+pars.start["Phi1"] <- 1
+pars.start[c("Phi2","Phi3")] <- 0
 
 saveRDS(list(data = data, model = my_model, pars.start = pars.start), "data_and_modelSpec.RDS")
 
