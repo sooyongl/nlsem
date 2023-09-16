@@ -173,6 +173,7 @@ while (run) {
     run <- FALSE
 }
 # <<<<<<<<<<<<<<<<<< EM algorithm ends <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+# In my case, stopped at 445th iteration
 
 # Finalize M estimation ----------------------------------------------------
 final <- nlminb(
