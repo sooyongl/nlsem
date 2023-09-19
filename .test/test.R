@@ -1,4 +1,5 @@
 # rm(list = ls())
+# setwd("C:/Users/lee/Documents/GitHub/nlsem/.test")
 # install.packages("nlsem")
 # install.packages(c("gaussquad","mvtnorm"))
 
@@ -10,8 +11,8 @@ library(data.table)
 library(tidyverse)
 
 # library(nlsem)
-# library(mvtnorm)
-# library(gaussquad)
+library(mvtnorm)
+library(gaussquad)
 # fdHess <- nlme::fdHess
 
 for(i in c("utils.R","customized_sampleStat.R",
@@ -218,18 +219,27 @@ MplusAutomation::runModels("test_inp.inp")
 file.show("test_inp.out")
 
 # -------------------------------------------------------------------------
+for(i in fs::dir_ls("R")) { source(i)}
 
-
-data("PoliticalDemocracy", package = "lavaan")
-dat <- as.matrix(PoliticalDemocracy[ ,c(9:11,1:8)])
+dat <- data.table::fread(fs::dir_ls("data")[1])
 
 model <- specify_sem(
-  num.x = 8, num.y = 3, 
+  num.x = 6, num.y = 3, 
   num.xi = 2, num.eta = 1,
-  xi = "x1-x3,y1-y4", 
-  eta = "y5-y8", 
+  xi = "x1-x3,x4-x6", 
+  eta = "y1-y3", 
   num.classes = 1,
   interaction = "eta1~xi1:xi2")
+
+specs <- as.data.frame(model)
+
+my_model <- create_sem(specs)
+my_model$matrices
+
+pars.start <- runif(count_free_parameters(my_model))
+
+
+
 
 em(model, data, start, qml = FALSE, verbose = FALSE, 
    convergence = 1e-02,
